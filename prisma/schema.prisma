@@ -1,0 +1,98 @@
+// Prisma schema for Reunite — Campus Lost & Found MVP
+// The matching engine is the heart of the product.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DATABASE_URL")
+}
+
+model User {
+  id           String         @id @default(cuid())
+  name         String
+  rollNumber   String         @unique
+  department   String
+  year         String
+  avatarColor  String         @default("emerald")
+  createdAt    DateTime       @default(now())
+  tickets      Ticket[]
+  messages     Message[]
+  chatRoomsA   ChatRoom[]     @relation("LostUser")
+  chatRoomsB   ChatRoom[]     @relation("FoundUser")
+  notifications Notification[]
+}
+
+model Ticket {
+  id          String     @id @default(cuid())
+  type        String     // "LOST" | "FOUND"
+  userId      String
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category    String     // e.g. "Electronics", "Clothing", "Bag", "Card", "Keys", "Bottle", "Book", "Other"
+  color       String
+  brand       String
+  size        String
+  location    String
+  date        DateTime
+  imageUrl    String?
+  description String?
+  status      String     @default("ACTIVE") // "ACTIVE" | "RESOLVED" | "EXPIRED"
+  createdAt   DateTime   @default(now())
+  expiresAt   DateTime
+
+  lostMatches    Match[]   @relation("LostTicket")
+  foundMatches   Match[]   @relation("FoundTicket")
+  chatRooms      ChatRoom[] @relation("TicketChatRooms")
+}
+
+model Match {
+  id            String   @id @default(cuid())
+  lostTicketId  String
+  foundTicketId String
+  lostTicket    Ticket   @relation("LostTicket", fields: [lostTicketId], references: [id], onDelete: Cascade)
+  foundTicket   Ticket   @relation("FoundTicket", fields: [foundTicketId], references: [id], onDelete: Cascade)
+  score         Float
+  level         String   // "POSSIBLE" | "STRONG" | "HIGHLY_LIKELY"
+  status        String   @default("NEW") // "NEW" | "CONTACTED" | "RESOLVED"
+  createdAt     DateTime @default(now())
+  chatRoom      ChatRoom?
+}
+
+model ChatRoom {
+  id          String    @id @default(cuid())
+  matchId     String    @unique
+  match       Match     @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  ticketId    String
+  ticket      Ticket    @relation("TicketChatRooms", fields: [ticketId], references: [id], onDelete: Cascade)
+  lostUserId  String
+  lostUser    User      @relation("LostUser", fields: [lostUserId], references: [id], onDelete: Cascade)
+  foundUserId String
+  foundUser   User      @relation("FoundUser", fields: [foundUserId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+  messages    Message[]
+}
+
+model Message {
+  id         String   @id @default(cuid())
+  chatRoomId String
+  chatRoom   ChatRoom @relation(fields: [chatRoomId], references: [id], onDelete: Cascade)
+  senderId   String
+  sender     User     @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  content    String
+  createdAt  DateTime @default(now())
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String   // "MATCH_FOUND" | "NEW_MESSAGE" | "SYSTEM"
+  title     String
+  body      String
+  link      String?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
